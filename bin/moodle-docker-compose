@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
 set -e
 
+
 # First find out if this was called from symlink,
 # then find the real path of parent directory.
 # This is needed because macOS does not have GNU realpath.
 thisfile=$( readlink "${BASH_SOURCE[0]}" ) || thisfile="${BASH_SOURCE[0]}"
 basedir="$( cd "$( dirname "$thisfile" )/../" && pwd -P )"
+
+#Import the environment variables.
+export $(grep -v '^#' "${basedir}/.env" | xargs)
 
 if [ ! -d "$MOODLE_DOCKER_WWWROOT" ];
 then

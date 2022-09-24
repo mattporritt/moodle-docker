@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -e
 
+#Import the environment variables.
+export $(grep -v '^#' ../.env | xargs)
+
 if [ ! -d "$MOODLE_DOCKER_WWWROOT" ];
 then
     echo 'Error: $MOODLE_DOCKER_WWWROOT is not set or not an existing directory'

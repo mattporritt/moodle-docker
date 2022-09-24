@@ -9,9 +9,9 @@ RUN apt-get install -y graphviz
 
 RUN git clone https://github.com/tideways/php-xhprof-extension.git /tmp/tideways
 WORKDIR /tmp/tideways
-RUN phpize  \
-RUN ./configure \
-RUN make \
+RUN phpize
+RUN ./configure
+RUN make
 RUN make install
 
 WORKDIR /var/www/html

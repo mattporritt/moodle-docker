@@ -185,10 +185,10 @@ then
 fi
 
 
-# Mac OS Compatbility
+# Mac OS Compatibility
 if [[ "$(uname)" == "Darwin" ]]; then
-    # Support https://docs.docker.com/docker-for-mac/osxfs-caching/
-    dockercompose="${dockercompose} -f ${basedir}/volumes-cached.yml"
+    # https://vivait.co.uk/labs/docker-for-mac-performance-using-nfs
+    dockercompose="${dockercompose} -f ${basedir}/volumes-nfs.yml"
 fi
 
 

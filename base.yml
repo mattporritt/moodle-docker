@@ -1,4 +1,4 @@
-version: "2"
+version: "3"
 services:
   webserver:
     image: "mattp:moodle_dev"
@@ -8,10 +8,10 @@ services:
       - "${MOODLE_DOCKER_WWWROOT}:/var/www/html"
       - "${ASSETDIR}/web/apache2_faildumps.conf:/etc/apache2/conf-enabled/apache2_faildumps.conf"
     environment:
-      MOODLE_DOCKER_DBNAME: moodle
-      MOODLE_DOCKER_DBUSER: moodle
-      MOODLE_DOCKER_DBPASS: "m@0dl3ing"
-      MOODLE_DOCKER_BROWSER: firefox
+      MOODLE_DOCKER_DBNAME: "${MOODLE_DOCKER_DBNAME}"
+      MOODLE_DOCKER_DBUSER: "${MOODLE_DOCKER_DBUSER}"
+      MOODLE_DOCKER_DBPASS: "${MOODLE_DOCKER_DBPASS}"
+      MOODLE_DOCKER_BROWSER: "${MOODLE_DOCKER_BROWSER}"
       MOODLE_DOCKER_WEB_HOST: "${MOODLE_DOCKER_WEB_HOST}"
   exttests:
     image: moodlehq/moodle-exttests
@@ -22,3 +22,30 @@ services:
     image: "selenium/standalone-firefox${MOODLE_DOCKER_SELENIUM_SUFFIX:-}:${MOODLE_DOCKER_BROWSER_TAG}"
     volumes:
       - "${MOODLE_DOCKER_WWWROOT}:/var/www/html:ro"
+  keycloak:
+    image: quay.io/keycloak/keycloak:latest
+    entrypoint: ["/opt/keycloak/bin/kc.sh", "start-dev", "--import-realm"]
+    volumes:
+      - "./keycloak_data:/opt/keycloak/data"
+    ports:
+      - 8080:8080
+    environment:
+      KEYCLOAK_ADMIN: "${KEYCLOAK_ADMIN}"
+      KEYCLOAK_ADMIN_PASSWORD: "${KEYCLOAK_ADMIN_PASSWORD}"
+  synapse:
+    image: "matrixdotorg/synapse:latest"
+    volumes:
+      - "./synapse_data:/data"
+    environment:
+      SYNAPSE_SERVER_NAME: "synapse"
+      SYNAPSE_REPORT_STATS: "yes"
+    ports:
+      - "8008:8008"
+  element:
+    image: vectorim/element-web
+    volumes:
+      - "./element_data/config.json:/app/config.json"
+    ports:
+      - "8081:80"
+    depends_on:
+      - synapse

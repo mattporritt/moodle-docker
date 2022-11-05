@@ -4,6 +4,12 @@ set -e
 #Import the environment variables.
 export $(grep -v '^#' ../.env | xargs)
 
+# First find out if this was called from symlink,
+# then find the real path of parent directory.
+# This is needed because macOS does not have GNU realpath.
+thisfile=$( readlink "${BASH_SOURCE[0]}" ) || thisfile="${BASH_SOURCE[0]}"
+basedir="$( cd "$( dirname "$thisfile" )/../" && pwd -P )"
+
 if [ ! -d "$MOODLE_DOCKER_WWWROOT" ];
 then
     echo 'Error: $MOODLE_DOCKER_WWWROOT is not set or not an existing directory'
@@ -16,15 +22,6 @@ then
     exit 1
 fi
 
-# Nasty portable way to the directory of this script, following symlink,
-# because readlink -f not on OSX. Thanks stack overflow..
-SOURCE="${BASH_SOURCE[0]}"
-while [ -h "$SOURCE" ]; do # resolve $SOURCE until the file is no longer a symlink
-  DIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )"
-  SOURCE="$(readlink "$SOURCE")"
-  [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE" # if $SOURCE was a relative symlink, we need to resolve it relative to the path where the symlink file was located
-done
-basedir="$( cd -P "$( dirname "$SOURCE" )/../" && pwd )"
 export ASSETDIR="${basedir}/assets"
 
 # Test if we have docker compose v2, and keep quiet if we don't.
@@ -41,17 +38,33 @@ dockercompose="${dockercompose} -f ${basedir}/service.mail.yml"
 # PHP Version.
 export MOODLE_DOCKER_PHP_VERSION=${MOODLE_DOCKER_PHP_VERSION:-7.4}
 
-# Database flavour
-if [ "$MOODLE_DOCKER_DB" != 'pgsql' ];
-then
-    dockercompose="${dockercompose} -f ${basedir}/db.${MOODLE_DOCKER_DB}.yml"
+# Database flavour.
+dockercompose="${dockercompose} -f ${basedir}/db.${MOODLE_DOCKER_DB}.yml"
 
+# Add support for version specific database settings.
+if [ ! -z "$MOODLE_DOCKER_DB_VERSION" ];
+then
+    filename="${basedir}/db.${MOODLE_DOCKER_DB}.${MOODLE_DOCKER_DB_VERSION}.yml"
+    if [ -f $filename ]; then
+        dockercompose="${dockercompose} -f ${filename}"
+    fi
 fi
 
-# Support PHP version overrides for DB..
-filename="${basedir}/db.${MOODLE_DOCKER_DB}.${MOODLE_DOCKER_PHP_VERSION}.yml"
-if [ -f $filename ]; then
-    dockercompose="${dockercompose} -f ${filename}"
+# Support PHP version overrides for DB not available any more.
+
+# Expose DB port if requested.
+if [[ $MOODLE_DOCKER_DB_PORT == *":"* ]] || [[ $MOODLE_DOCKER_DB_PORT -gt 0 ]]
+then
+    # If no bind ip has been configured (bind_ip:port), default to 127.0.0.1
+    if [[ ! $MOODLE_DOCKER_DB_PORT == *":"* ]]
+    then
+        export MOODLE_DOCKER_DB_PORT=127.0.0.1:$MOODLE_DOCKER_DB_PORT
+    fi
+    filename="${basedir}/db.${MOODLE_DOCKER_DB}.port.yml"
+    if [ -f $filename ];
+    then
+        dockercompose="${dockercompose} -f ${filename}"
+    fi
 fi
 
 # Fix mobile app deprecated variables

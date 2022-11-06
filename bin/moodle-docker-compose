@@ -200,6 +200,7 @@ fi
 
 # Mac OS Compatibility
 if [[ "$(uname)" == "Darwin" ]]; then
+    echo 'Running OSX so using NFS'
     # https://vivait.co.uk/labs/docker-for-mac-performance-using-nfs
     dockercompose="${dockercompose} -f ${basedir}/volumes-nfs.yml"
 fi

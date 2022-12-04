@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM arm64v8/ubuntu:22.04
+FROM ubuntu:22.04
 MAINTAINER mattp pozze30@gmail.com
 
 # Initial setup requirements
@@ -13,6 +13,9 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 RUN DEBIAN_FRONTEND=noninteractive apt-get install -y  --no-install-recommends tzdata
 
 RUN apt install -y nginx
+COPY assets/default /etc/nginx/sites-enabled/default
+COPY assets/nginx.conf /etc/nginx/nginx.conf
+RUN mkdir /run/php
 
 # PHP setup
 RUN add-apt-repository --yes ppa:ondrej/php
@@ -22,6 +25,7 @@ RUN apt install -y php7.4 php7.4-cli php7.4-dev
 RUN apt-get install -y graphviz php7.4-pgsql php7.4-json php7.4-common php7.4-zip php7.4-gd \
      php7.4-mbstring php7.4-curl php7.4-xml php7.4-bcmath php7.4-fpm
 RUN apt-get remove --purge -y apache2
+RUN echo "exit 0" > /usr/sbin/policy-rc.d
 
 # Setup profiling requirements.
 RUN git clone https://github.com/tideways/php-xhprof-extension.git /tmp/tideways
@@ -43,4 +47,4 @@ EXPOSE 80
 
 STOPSIGNAL SIGQUIT
 
-CMD ["nginx", "-g", "daemon off;"]
+CMD /etc/init.d/php7.4-fpm restart && nginx -g "daemon off;"

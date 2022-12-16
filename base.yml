@@ -8,6 +8,7 @@ services:
       - "${MOODLE_DOCKER_WWWROOT}:/var/www/html"
       - "${ASSETDIR}/web/apache2_faildumps.conf:/etc/apache2/conf-enabled/apache2_faildumps.conf"
     environment:
+      MOODLE_DOCKER_DBTYE: "${MOODLE_DOCKER_DB}"
       MOODLE_DOCKER_DBNAME: "${MOODLE_DOCKER_DBNAME}"
       MOODLE_DOCKER_DBUSER: "${MOODLE_DOCKER_DBUSER}"
       MOODLE_DOCKER_DBPASS: "${MOODLE_DOCKER_DBPASS}"

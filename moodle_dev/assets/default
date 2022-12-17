@@ -1,7 +1,7 @@
 server {
         listen 80;
 #       listen 443 ssl;
-        server_name webserver;
+        server_name localhost;
       	server_name_in_redirect off;
       	port_in_redirect off;
 
@@ -39,7 +39,7 @@ server {
         	try_files $uri @addslash;
       	}
       	location @addslash {
-          rewrite ^ http://webserver$request_uri/? permanent;
+          rewrite ^ http://localhost$request_uri/? permanent;
       	}
 
     	location / {

@@ -47,7 +47,7 @@ services:
   synapse:
     image: "matrixdotorg/synapse:latest"
     volumes:
-      - "./synapse_data:/data"
+      - "./synapse_data:/data:rw"
       - "./moodle_dev/assets/certs/:/etc/ssl/certs/"
     environment:
       SYNAPSE_SERVER_NAME: "synapse"

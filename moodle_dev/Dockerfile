@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 FROM moodlehq/moodle-php-apache:8.0
-MAINTAINER mattp pozze30@gmail.com
+MAINTAINER stevando stevando.sm@gmail.com
 
 # Setup profiling requirements.
 RUN apt-get -y update

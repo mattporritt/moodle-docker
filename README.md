@@ -9,6 +9,7 @@ The services set up are:
 * Selenium
 * Matrix (Both Synapse and Element)
 * Keycloak
+* Matrix-synapase Mock
 
 Once the following steps are complete the sites can be accessed at the following URLs:
 * Moodle LMS: https://webserver/
@@ -16,6 +17,9 @@ Once the following steps are complete the sites can be accessed at the following
 * Element: https://element:8081/
 * Synapse: https://synapse:8008/
 * Mailhog: http://webserver:1234/_/mail
+* Matrix-synapase Mock: http://localhost:8001 (Make sure port 8001 is not used)
+
+For Matrix-synapase Mock, there will not be any settings needed and will be available once the "Build and Install" step is done.
 
 The entire setup process should take about: 45 minutes
 
@@ -146,7 +150,7 @@ To add the certificate to firefox to get rid of the self signed warning. (Chrome
 ## Build and install
 Next we need to build our version of the moodle dev container:<br/>
 `cd moodle-docker/moodle_dev`<br/>
-`docker build -t "mattp:moodle_dev" .`
+`docker build -t "stevando:moodle_dev" .`
 
 Finally, actually start the services:<br/>
 `cd moodle-docker/bin`<br/>
@@ -286,6 +290,7 @@ Once the above steps are complete the sites can be accessed at the following URL
 * Element: https://element:8081/
 * Synapse: https://synapse:8008/
 * Mailhog: http://webserver:1234/_/mail
+* Matrix-synapase Mock: http://localhost:8001
 
 # PHP Unit Tests
 Running unit tests in the docker container is very similar to running them from the command line in a VM.

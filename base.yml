@@ -1,7 +1,7 @@
 version: "3"
 services:
   webserver:
-    image: "mattp:moodle_dev"
+    image: "stevando:moodle_dev"
     depends_on:
       - db
     volumes:
@@ -25,7 +25,7 @@ services:
   selenium:
     image: "selenium/standalone-firefox${MOODLE_DOCKER_SELENIUM_SUFFIX:-}:${MOODLE_DOCKER_BROWSER_TAG}"
     volumes:
-      - "${MOODLE_DOCKER_WWWROOT}:/var/www/html:ro"
+      - "${MOODLE_DOCKER_WWWROOT}:/var/www/html:rw"
   keycloak:
     image: quay.io/keycloak/keycloak:latest
     entrypoint: ["/opt/keycloak/bin/kc.sh", "start-dev", "--import-realm"]

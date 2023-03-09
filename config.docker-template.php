@@ -84,4 +84,18 @@ if (getenv('MOODLE_DOCKER_PHPUNIT_EXTRAS')) {
     define('TEST_ENROL_LDAP_DOMAIN', 'ou=Users,dc=openstack,dc=org');
 }
 
+// Start matrix unit test
+$matrixdomainservice = 'localhost:8001';
+if (!empty(getenv('MOODLE_DOCKER_DBNAME'))) {
+  $matrixdomainservice = 'elementmock';
+}
+
+if (property_exists($CFG, 'behat_wwwroot')) {
+    $mockhash = sha1($CFG->behat_wwwroot);
+} else {
+    $mockhash = sha1($CFG->wwwroot);
+}
+define('TEST_COMMUNICATION_MATRIX_MOCK_SERVER', "http://{$matrixdomainservice}/{$mockhash}");
+// End matrix unit test
+
 require_once(__DIR__ . '/lib/setup.php');

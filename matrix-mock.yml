@@ -1,0 +1,9 @@
+version: "3"
+services:
+  elementmock:
+    image: stevando/matrixsynapse_mock
+    environment:
+      MOODLE_DOCKER_MATRIX_MOCK: "true"
+    ports:
+    - "8001:80"
+    restart: on-failure

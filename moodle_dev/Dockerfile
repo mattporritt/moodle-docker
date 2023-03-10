@@ -22,6 +22,8 @@ COPY assets/tideways.ini /usr/local/etc/php/conf.d/tideways.ini
 # Setup debug requirements.
 RUN pecl install xdebug
 COPY assets/docker-php-ext-xdebug.ini /usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini
+# Add guzzle securiry requirements.
+COPY assets/docker-php-ext-guzzle.ini /usr/local/etc/php/conf.d/docker-php-ext-guzzle.ini
 
 # SSL for Apache2
 COPY assets/certs/ /etc/ssl/certs/

@@ -17,7 +17,7 @@ Once the following steps are complete the sites can be accessed at the following
 * Element: https://element:8081/
 * Synapse: https://synapse:8008/
 * Mailhog: http://webserver:1234/_/mail
-* Matrix-synapase Mock: http://localhost:8001 (Make sure port 8001 is not used)
+* Matrix-synapase Mock: http://elementmock:8001 (Make sure port 8001 is not used)
 
 For Matrix-synapase Mock, there will not be any settings needed and will be available once the "Build and Install" step is done.
 
@@ -111,9 +111,10 @@ Update your local hosts file: `/etc/hosts` to include the following names for th
 * Synapse
 * Element
 * Webserver (Moodle)
+* Elementmoc (Matrix-synapse Mock)
 
 If you haven’t already customised your hosts file the line should look like:<br/>
-`127.0.0.1   	localhost synapse webserver keycloak element`
+`127.0.0.1   	localhost synapse webserver keycloak element elementmock`
 
 ## SSL Setup
 Next make the self signed certs so we can run Moodle and associated services over ssl/tls. This is required to setup SSO.<br/>
@@ -290,7 +291,7 @@ Once the above steps are complete the sites can be accessed at the following URL
 * Element: https://element:8081/
 * Synapse: https://synapse:8008/
 * Mailhog: http://webserver:1234/_/mail
-* Matrix-synapase Mock: http://localhost:8001
+* Matrix-synapase Mock: http://elementmock:8001
 
 # PHP Unit Tests
 Running unit tests in the docker container is very similar to running them from the command line in a VM.

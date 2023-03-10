@@ -85,7 +85,7 @@ if (getenv('MOODLE_DOCKER_PHPUNIT_EXTRAS')) {
 }
 
 // Start matrix unit test
-$matrixdomainservice = 'localhost:8001';
+$matrixdomainservice = 'elementmock:8001';
 if (!empty(getenv('MOODLE_DOCKER_DBNAME'))) {
   $matrixdomainservice = 'elementmock';
 }

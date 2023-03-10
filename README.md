@@ -111,6 +111,7 @@ Update your local hosts file: `/etc/hosts` to include the following names for th
 * Synapse
 * Element
 * Webserver (Moodle)
+* Elementmoc (Matrix-synapse Mock)
 
 If you haven’t already customised your hosts file the line should look like:<br/>
 `127.0.0.1   	localhost synapse webserver keycloak element elementmock`

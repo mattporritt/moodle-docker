@@ -153,6 +153,9 @@ Next we need to build our version of the moodle dev container:<br/>
 `cd moodle-docker/moodle_dev`<br/>
 `docker build -t "stevando:moodle_dev" .`
 
+Set the environment variable if you want to run Matrix test mock server
+`export MOODLE_DOCKER_MATRIX_MOCK=true`
+
 Finally, actually start the services:<br/>
 `cd moodle-docker/bin`<br/>
 `./moodle-docker-compose up -d`
@@ -334,3 +337,12 @@ To dump the db from the host machine:<br/>
 
 To restore the db when none exists:<br/>
 `pg_restore -h 127.0.0.1 -p 5433 -U moodle -d moodle moodle.dump`
+
+## Environment variables
+
+You can change the configuration of the docker images by setting various environment variables **before** calling `bin/moodle-docker-compose up`.
+When you change them, use `bin/moodle-docker-compose down && bin/moodle-docker-compose up -d` to recreate your environment.
+
+| Environment Variable                      | Mandatory | Allowed values                        | Default value | Notes                                                                        |
+|-------------------------------------------|-----------|---------------------------------------|---------------|------------------------------------------------------------------------------|
+| `MOODLE_DOCKER_MATRIX_MOCK`               | no        | any value                             | not set       | If set, matrix test mock server is added                                     |

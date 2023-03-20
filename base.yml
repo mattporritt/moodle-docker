@@ -45,7 +45,7 @@ services:
       timeout: 10s
       retries: 5
   synapse:
-    image: "matrixdotorg/synapse:latest"
+    image: "matrixdotorg/synapse:v1.78.0"
     volumes:
       - "./synapse_data:/data:rw"
       - "./moodle_dev/assets/certs/:/etc/ssl/certs/"

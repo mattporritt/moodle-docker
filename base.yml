@@ -15,6 +15,7 @@ services:
       MOODLE_DOCKER_DBPASS: "${MOODLE_DOCKER_DBPASS}"
       MOODLE_DOCKER_BROWSER: "${MOODLE_DOCKER_BROWSER}"
       MOODLE_DOCKER_WEB_HOST: "${MOODLE_DOCKER_WEB_HOST}"
+      PHP_IDE_CONFIG: "serverName=moodle-local"
     ports:
       - "443:443"
   exttests:

@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM moodlehq/moodle-php-apache:8.0
+FROM moodlehq/moodle-php-apache:8.2
 MAINTAINER stevando stevando.sm@gmail.com
 
 # Setup profiling requirements.
@@ -20,7 +20,6 @@ RUN rm -rf /tmp/tideways
 COPY assets/tideways.ini /usr/local/etc/php/conf.d/tideways.ini
 
 # Setup debug requirements.
-RUN pecl install xdebug
 COPY assets/docker-php-ext-xdebug.ini /usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini
 # Add guzzle securiry requirements.
 COPY assets/docker-php-ext-guzzle.ini /usr/local/etc/php/conf.d/docker-php-ext-guzzle.ini

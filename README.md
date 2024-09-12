@@ -224,7 +224,7 @@ Set up the Moodle client:<br/>
 
 Set up the Synapse client:<br/>
 * Click Clients from the Manage menu on the left of the page
-* From the list of clients that are displayed click on the “moodle-client” link in the Client ID column
+* From the list of clients that are displayed click on the “synapse-client” link in the Client ID column
 * Click the Credentials tab
 * Click the Regenerate button for the Client secret
 * Note the Client secret.

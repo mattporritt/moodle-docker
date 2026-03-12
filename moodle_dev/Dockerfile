@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM moodlehq/moodle-php-apache:8.2
+FROM moodlehq/moodle-php-apache:8.3
 MAINTAINER stevando stevando.sm@gmail.com
 
 # Setup profiling requirements.

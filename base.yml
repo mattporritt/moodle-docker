@@ -1,19 +1,22 @@
 services:
   webserver:
-    image: "moodlehq/moodle-php-apache:${MOODLE_DOCKER_PHP_VERSION}"
+    image: "mattp:moodle_dev"
     depends_on:
       - db
     volumes:
       - "${MOODLE_DOCKER_WWWROOT}:/var/www/html"
-      - "${ASSETDIR}/web/apache2_faildumps.conf:/etc/apache2/conf-enabled/moodle-faildump.conf"
+      - "${ASSETDIR}/web/apache2_faildumps.conf:/etc/apache2/conf-enabled/apache2_faildumps.conf"
+    tmpfs:
+      - /muc
     environment:
-      MOODLE_DOCKER_RUNNING: 1
-      MOODLE_DOCKER_DBNAME: moodle
-      MOODLE_DOCKER_DBUSER: moodle
-      MOODLE_DOCKER_DBPASS: "m@0dl3ing"
-      MOODLE_DOCKER_BROWSER: firefox
+      MOODLE_DOCKER_DBNAME: "${MOODLE_DOCKER_DBNAME}"
+      MOODLE_DOCKER_DBUSER: "${MOODLE_DOCKER_DBUSER}"
+      MOODLE_DOCKER_DBPASS: "${MOODLE_DOCKER_DBPASS}"
+      MOODLE_DOCKER_BROWSER: "${MOODLE_DOCKER_BROWSER}"
       MOODLE_DOCKER_WEB_HOST: "${MOODLE_DOCKER_WEB_HOST}"
-      MOODLE_DOCKER_TIMEOUT_FACTOR: "${MOODLE_DOCKER_TIMEOUT_FACTOR}"
+      PHP_IDE_CONFIG: "serverName=moodle-local"
+    ports:
+      - "443:443"
   exttests:
     image: moodlehq/moodle-exttests
     volumes:
@@ -22,4 +25,29 @@ services:
   selenium:
     image: "selenium/standalone-firefox${MOODLE_DOCKER_SELENIUM_SUFFIX:-}:${MOODLE_DOCKER_BROWSER_TAG}"
     volumes:
-      - "${MOODLE_DOCKER_WWWROOT}:/var/www/html:ro"
+      - "${MOODLE_DOCKER_WWWROOT}:/var/www/html:rw"
+  keycloak:
+    image: quay.io/keycloak/keycloak:latest
+    entrypoint: ["/opt/keycloak/bin/kc.sh", "start-dev", "--import-realm"]
+    volumes:
+      - "./keycloak/data:/opt/keycloak/data"
+      - "./keycloak/keycloak.conf:/opt/keycloak/conf/keycloak.conf"
+      - "./moodle_dev/assets/certs/:/etc/ssl/certs/"
+    ports:
+      - 8080:8080
+      - 8443:8443
+    environment:
+      KEYCLOAK_ADMIN: "${KEYCLOAK_ADMIN}"
+      KEYCLOAK_ADMIN_PASSWORD: "${KEYCLOAK_ADMIN_PASSWORD}"
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "-k", "https://keycloak:8443/realms/moodle/.well-known/openid-configuration" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+networks:
+  default:
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.32.238.0/24
+          gateway: 172.32.238.1

@@ -1,2 +1,14 @@
 local.yml
-/moodle/
+.idea/
+.env
+homeserver.db
+media_store/
+keycloak/data/h2/
+moodle_dev/assets/certs/*.key
+moodle_dev/assets/certs/*.crt
+moodle_dev/assets/certs/*.csr
+moodle_dev/assets/certs/*.ext
+moodle_dev/assets/certs/*.pem
+moodle_dev/assets/certs/*.srl
+!keycloak/data/h2/README.md
+.DS_Store

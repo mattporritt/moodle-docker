@@ -7,6 +7,9 @@ set -e
 thisfile=$( readlink "${BASH_SOURCE[0]}" ) || thisfile="${BASH_SOURCE[0]}"
 basedir="$( cd "$( dirname "$thisfile" )/../" && pwd -P )"
 
+#Import the environment variables.
+export $(grep -v '^#' "${basedir}/.env" | xargs)
+
 if [ ! -d "$MOODLE_DOCKER_WWWROOT" ];
 then
     echo 'Error: $MOODLE_DOCKER_WWWROOT is not set or not an existing directory'
@@ -210,6 +213,9 @@ then
     dockercompose="${dockercompose} -f ${basedir}/behat-faildump.yml"
 fi
 
+# Behat test timeout factor
+export MOODLE_DOCKER_TIMEOUT_FACTOR=${MOODLE_DOCKER_TIMEOUT_FACTOR:-1}
+
 # Webserver host
 export MOODLE_DOCKER_WEB_HOST=${MOODLE_DOCKER_WEB_HOST:-localhost}
 
@@ -224,9 +230,6 @@ then
     fi
     dockercompose="${dockercompose} -f ${basedir}/webserver.port.yml"
 fi
-
-# Behat test timeout factor
-export MOODLE_DOCKER_TIMEOUT_FACTOR=${MOODLE_DOCKER_TIMEOUT_FACTOR:-1}
 
 # Mac OS Compatbility
 if [[ "$(uname)" == "Darwin" ]]; then

@@ -1,0 +1,23 @@
+services:
+  webserver:
+    environment:
+      MOODLE_DOCKER_BROWSER: firefox
+  selenium-hub:
+    image: "selenium/hub:${MOODLE_DOCKER_BROWSER_TAG}"
+    environment:
+      SE_GRID_BROWSER_TIMEOUT: 120
+      SE_GRID_TIMEOUT: 120
+  selenium-firefox:
+    image: "selenium/node-firefox:${MOODLE_DOCKER_BROWSER_TAG}"
+    depends_on:
+      - selenium-hub
+    shm_size: 2gb
+    environment:
+      SE_EVENT_BUS_HOST: selenium-hub
+      SE_EVENT_BUS_PUBLISH_PORT: 4442
+      SE_EVENT_BUS_SUBSCRIBE_PORT: 4443
+      SE_NODE_MAX_SESSIONS: 1
+      SE_NODE_OVERRIDE_MAX_SESSIONS: "true"
+    volumes:
+      - "${MOODLE_DOCKER_WWWROOT}:/var/www/html:rw"
+      - /dev/shm:/dev/shm

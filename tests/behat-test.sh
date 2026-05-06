@@ -7,18 +7,15 @@ export MOODLE_DOCKER_WWWROOT="${basedir}/moodle"
 
 if [ -d "${MOODLE_DOCKER_WWWROOT}/public" ];
 then
-    MOODLE_BEHAT_CLI_ROOT="public/admin/tool/behat/cli"
+    :
 else
-    MOODLE_BEHAT_CLI_ROOT="admin/tool/behat/cli"
+    :
 fi
 
-if [ "$SUITE" = "behat" ];
-then
-    testcmd="bin/moodle-docker-compose exec -T webserver php ${MOODLE_BEHAT_CLI_ROOT}/run.php --tags=@auth_manual"
-else
+if [ "$SUITE" != "behat" ]; then
     echo "Error, unknown suite '$SUITE'"
     exit 1
 fi
 
-echo "Running: $testcmd"
-$basedir/$testcmd
+echo "Running serial Behat tests"
+$basedir/bin/behat-run serial --tags=@auth_manual

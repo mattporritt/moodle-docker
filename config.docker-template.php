@@ -36,15 +36,29 @@ $CFG->phpunit_prefix = 't_';
 define('TEST_EXTERNAL_FILES_HTTP_URL', 'http://exttests:9000');
 define('TEST_EXTERNAL_FILES_HTTPS_URL', 'http://exttests:9000');
 
+$behatmode = getenv('MOODLE_DOCKER_BEHAT_MODE') ?: 'serial';
+$behatparallel = max(1, (int)(getenv('MOODLE_DOCKER_BEHAT_PARALLEL') ?: 4));
+$behatwebdriverhost = ($behatmode === 'parallel')
+    ? 'http://selenium-hub:4444/wd/hub'
+    : 'http://selenium:4444/wd/hub';
+
 $CFG->behat_wwwroot   = 'http://webserver';
 $CFG->behat_dataroot  = '/var/www/behatdata';
 $CFG->behat_prefix = 'b_';
 $CFG->behat_profiles = array(
     'default' => array(
         'browser' => getenv('MOODLE_DOCKER_BROWSER'),
-        'wd_host' => 'http://selenium:4444/wd/hub',
+        'wd_host' => $behatwebdriverhost,
     ),
 );
+if ($behatmode === 'parallel') {
+    $CFG->behat_parallel_run = array();
+    for ($i = 0; $i < $behatparallel; $i++) {
+        $CFG->behat_parallel_run[] = array(
+            'wd_host' => $behatwebdriverhost,
+        );
+    }
+}
 $CFG->behat_faildump_path = '/var/www/behatfaildumps';
 $CFG->behat_increasetimeout = getenv('MOODLE_DOCKER_TIMEOUT_FACTOR');
 

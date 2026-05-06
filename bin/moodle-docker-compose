@@ -37,6 +37,8 @@ dockercompose="${dockercompose} -f ${basedir}/service.mail.yml"
 
 # PHP Version.
 export MOODLE_DOCKER_PHP_VERSION=${MOODLE_DOCKER_PHP_VERSION:-8.3}
+export MOODLE_DOCKER_BEHAT_MODE=${MOODLE_DOCKER_BEHAT_MODE:-serial}
+export MOODLE_DOCKER_BEHAT_PARALLEL=${MOODLE_DOCKER_BEHAT_PARALLEL:-4}
 
 # Database flavour.
 dockercompose="${dockercompose} -f ${basedir}/db.${MOODLE_DOCKER_DB}.yml"
@@ -143,6 +145,33 @@ then
     MOODLE_DOCKER_BROWSER_TAG=4
 fi
 
+if [[ "$MOODLE_DOCKER_BEHAT_MODE" != "serial" && "$MOODLE_DOCKER_BEHAT_MODE" != "parallel" ]];
+then
+    echo "Error: MOODLE_DOCKER_BEHAT_MODE must be 'serial' or 'parallel'"
+    exit 1
+fi
+
+if [[ "$MOODLE_DOCKER_BEHAT_MODE" == "parallel" ]];
+then
+    if [[ "$MOODLE_DOCKER_BROWSER_NAME" != "firefox" ]];
+    then
+        echo "Error: parallel Behat mode currently supports firefox only"
+        exit 1
+    fi
+
+    if [[ ! "$MOODLE_DOCKER_BEHAT_PARALLEL" =~ ^[1-9][0-9]*$ ]];
+    then
+        echo "Error: MOODLE_DOCKER_BEHAT_PARALLEL must be a positive integer"
+        exit 1
+    fi
+
+    if [[ ! -z "$MOODLE_DOCKER_SELENIUM_VNC_PORT" ]];
+    then
+        echo "Error: MOODLE_DOCKER_SELENIUM_VNC_PORT is only supported in serial Behat mode"
+        exit 1
+    fi
+fi
+
 # Mobile app for development
 if [[ "$MOODLE_DOCKER_BROWSER_NAME" == "chrome" ]];
 then
@@ -156,14 +185,19 @@ then
     fi
 fi
 
-if [[ "$MOODLE_DOCKER_BROWSER_NAME" != "firefox" ]];
+if [[ "$MOODLE_DOCKER_BEHAT_MODE" == "parallel" ]];
+then
+    dockercompose="${dockercompose} -f ${basedir}/selenium.grid.yml"
+elif [[ "$MOODLE_DOCKER_BROWSER_NAME" != "firefox" ]];
 then
     dockercompose="${dockercompose} -f ${basedir}/selenium.${MOODLE_DOCKER_BROWSER_NAME}.yml"
+else
+    dockercompose="${dockercompose} -f ${basedir}/selenium.firefox.yml"
 fi
 
 # Selenium VNC port
 export MOODLE_DOCKER_SELENIUM_SUFFIX=""
-if [[ $MOODLE_DOCKER_SELENIUM_VNC_PORT == *":"* ]] || [[ $MOODLE_DOCKER_SELENIUM_VNC_PORT -gt 0 ]]
+if [[ "$MOODLE_DOCKER_BEHAT_MODE" != "parallel" ]] && ([[ $MOODLE_DOCKER_SELENIUM_VNC_PORT == *":"* ]] || [[ $MOODLE_DOCKER_SELENIUM_VNC_PORT -gt 0 ]])
 then
     if [[ $(echo $MOODLE_DOCKER_BROWSER_TAG | sed 's/[^0-9].*//g') -lt 4 ]]
     then

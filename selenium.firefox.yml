@@ -1,9 +1,9 @@
 services:
   webserver:
     environment:
-      MOODLE_DOCKER_BROWSER: chrome
+      MOODLE_DOCKER_BROWSER: firefox
   selenium:
-    image: "selenium/standalone-chrome${MOODLE_DOCKER_SELENIUM_SUFFIX:-}:${MOODLE_DOCKER_BROWSER_TAG}"
+    image: "selenium/standalone-firefox${MOODLE_DOCKER_SELENIUM_SUFFIX:-}:${MOODLE_DOCKER_BROWSER_TAG}"
     volumes:
       - "${MOODLE_DOCKER_WWWROOT}:/var/www/html:rw"
       - /dev/shm:/dev/shm

@@ -275,6 +275,40 @@ To initialise behat environment:<br/>
 To run behat tests:<br/>
 `./moodle-docker-compose exec -u www-data webserver php admin/tool/behat/cli/run.php --tags=@auth_manual`
 
+## Serial and parallel Behat modes
+This repository now supports two separate Behat execution modes so small local runs and larger parallel runs do not interfere with each other.
+
+Serial mode uses the existing standalone Selenium container and remains the default mode.
+
+Initialise serial Behat:<br/>
+`bin/behat-init serial`
+
+Run serial Behat:<br/>
+`bin/behat-run serial --tags=@auth_manual`
+
+Parallel mode uses Selenium Grid with a `selenium-hub` container and a scaled `selenium-firefox` node service. Firefox is the only supported browser for parallel mode.
+
+Initialise parallel Behat with the default 4 workers:<br/>
+`bin/behat-init parallel`
+
+Run parallel Behat:<br/>
+`bin/behat-run parallel --tags='@javascript'`
+
+You can change the parallel worker count with:<br/>
+`export MOODLE_DOCKER_BEHAT_PARALLEL=6`
+
+The wrappers set `MOODLE_DOCKER_BEHAT_MODE` for you, start the correct Selenium topology, wait for Selenium to become ready, and then execute Moodle's `init.php` or `run.php`.
+
+Operator note:<br/>
+Use serial mode for single features, small tag runs, and debugging because startup is simpler and output is easier to read.<br/>
+Use parallel mode for broader Behat subsets and Javascript-heavy runs where setup cost is worth the reduced wall-clock time.<br/>
+When switching between serial and parallel modes, prefer the wrapper commands so the old Selenium topology is removed automatically.
+
+If you prefer the raw commands, parallel mode is still just Moodle's native parallel runner:<br/>
+`MOODLE_DOCKER_BEHAT_MODE=parallel MOODLE_DOCKER_BEHAT_PARALLEL=4 ./bin/moodle-docker-compose up -d --scale selenium-firefox=4`<br/>
+`./bin/moodle-docker-compose exec webserver php public/admin/tool/behat/cli/init.php --parallel=4`<br/>
+`./bin/moodle-docker-compose exec -u www-data webserver php public/admin/tool/behat/cli/run.php --tags='@javascript'`
+
 # Mailhog
 MailHog is an email-testing tool with a fake SMTP server underneath. It encapsulates the SMTP protocol with extensions and does not require specific backend implementations. MailHog runs a super simple SMTP server that hogs outgoing emails sent to it. You can see the hogged emails in a web interface.
 
@@ -308,3 +342,5 @@ When you change them, use `bin/moodle-docker-compose down && bin/moodle-docker-c
 | Environment Variable                      | Mandatory | Allowed values                        | Default value | Notes                                                                        |
 |-------------------------------------------|-----------|---------------------------------------|---------------|------------------------------------------------------------------------------|
 | `MOODLE_DOCKER_MATRIX_MOCK`               | no        | any value                             | not set       | If set, matrix test mock server is added                                     |
+| `MOODLE_DOCKER_BEHAT_MODE`               | no        | `serial`, `parallel`                  | `serial`      | Selects standalone Selenium or Selenium Grid for Behat                       |
+| `MOODLE_DOCKER_BEHAT_PARALLEL`           | no        | positive integer                      | `4`           | Default parallel worker count for Behat Grid mode                            |

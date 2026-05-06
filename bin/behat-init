@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+thisfile=$( readlink "${BASH_SOURCE[0]}" ) || thisfile="${BASH_SOURCE[0]}"
+basedir="$( cd "$( dirname "$thisfile" )/../" && pwd -P )"
+
+mode="${1:-serial}"
+if [[ $# -gt 0 ]]; then
+    shift
+fi
+
+if [[ "$mode" != "serial" && "$mode" != "parallel" ]]; then
+    echo "Usage: $0 [serial|parallel] [init.php options...]"
+    exit 1
+fi
+
+export $(grep -v '^#' "${basedir}/.env" | xargs)
+export MOODLE_DOCKER_BEHAT_MODE="$mode"
+export MOODLE_DOCKER_BEHAT_PARALLEL="${MOODLE_DOCKER_BEHAT_PARALLEL:-4}"
+
+if [ -d "${MOODLE_DOCKER_WWWROOT}/public" ]; then
+    MOODLE_BEHAT_CLI_ROOT="public/admin/tool/behat/cli"
+else
+    MOODLE_BEHAT_CLI_ROOT="admin/tool/behat/cli"
+fi
+
+up_args=(up -d --remove-orphans)
+if [[ "$mode" == "parallel" ]]; then
+    up_args+=(--scale "selenium-firefox=${MOODLE_DOCKER_BEHAT_PARALLEL}")
+fi
+
+echo "Starting containers for ${mode} Behat mode"
+"${basedir}/bin/moodle-docker-compose" "${up_args[@]}"
+"${basedir}/bin/moodle-docker-wait-for-db"
+"${basedir}/bin/moodle-docker-wait-for-selenium"
+
+init_args=()
+if [[ "$mode" == "parallel" ]]; then
+    init_args+=("--parallel=${MOODLE_DOCKER_BEHAT_PARALLEL}")
+fi
+if [[ $# -gt 0 ]]; then
+    init_args+=("$@")
+fi
+
+echo "Initialising ${mode} Behat environment"
+if [[ ${#init_args[@]} -gt 0 ]]; then
+    "${basedir}/bin/moodle-docker-compose" exec -T webserver php "${MOODLE_BEHAT_CLI_ROOT}/init.php" "${init_args[@]}"
+else
+    "${basedir}/bin/moodle-docker-compose" exec -T webserver php "${MOODLE_BEHAT_CLI_ROOT}/init.php"
+fi

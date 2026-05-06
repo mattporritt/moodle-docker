@@ -13,6 +13,8 @@ services:
       MOODLE_DOCKER_DBUSER: "${MOODLE_DOCKER_DBUSER}"
       MOODLE_DOCKER_DBPASS: "${MOODLE_DOCKER_DBPASS}"
       MOODLE_DOCKER_BROWSER: "${MOODLE_DOCKER_BROWSER}"
+      MOODLE_DOCKER_BEHAT_MODE: "${MOODLE_DOCKER_BEHAT_MODE}"
+      MOODLE_DOCKER_BEHAT_PARALLEL: "${MOODLE_DOCKER_BEHAT_PARALLEL}"
       MOODLE_DOCKER_WEB_HOST: "${MOODLE_DOCKER_WEB_HOST}"
       PHP_IDE_CONFIG: "serverName=moodle-local"
     ports:
@@ -22,10 +24,6 @@ services:
     volumes:
       - "${ASSETDIR}/exttests/apache2_ports.conf:/etc/apache2/ports.conf"
       - "${ASSETDIR}/exttests/apache2.conf:/etc/apache2/sites-enabled/000-default.conf"
-  selenium:
-    image: "selenium/standalone-firefox${MOODLE_DOCKER_SELENIUM_SUFFIX:-}:${MOODLE_DOCKER_BROWSER_TAG}"
-    volumes:
-      - "${MOODLE_DOCKER_WWWROOT}:/var/www/html:rw"
   keycloak:
     image: quay.io/keycloak/keycloak:latest
     entrypoint: ["/opt/keycloak/bin/kc.sh", "start-dev", "--import-realm"]

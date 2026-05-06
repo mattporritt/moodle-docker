@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+thisfile=$( readlink "${BASH_SOURCE[0]}" ) || thisfile="${BASH_SOURCE[0]}"
+basedir="$( cd "$( dirname "$thisfile" )/../" && pwd -P )"
+
+export $(grep -v '^#' "${basedir}/.env" | xargs)
+export MOODLE_DOCKER_BEHAT_MODE=${MOODLE_DOCKER_BEHAT_MODE:-serial}
+
+if [[ "$MOODLE_DOCKER_BEHAT_MODE" == "parallel" ]]; then
+    SELENIUM_STATUS_URL="http://selenium-hub:4444/wd/hub/status"
+else
+    SELENIUM_STATUS_URL="http://selenium:4444/wd/hub/status"
+fi
+
+echo "Waiting for Selenium at ${SELENIUM_STATUS_URL}"
+
+for attempt in {1..60}; do
+    if "${basedir}/bin/moodle-docker-compose" exec -T -e SELENIUM_STATUS_URL="$SELENIUM_STATUS_URL" webserver php -r '
+        $statusurl = getenv("SELENIUM_STATUS_URL");
+        $response = @file_get_contents($statusurl);
+        if ($response === false) {
+            exit(1);
+        }
+        $decoded = json_decode($response, true);
+        $ready = $decoded["value"]["ready"] ?? null;
+        $legacy = $decoded["status"] ?? null;
+        exit(($ready === true || $legacy === 0) ? 0 : 1);
+    ' >/dev/null 2>&1; then
+        echo "Selenium is ready"
+        exit 0
+    fi
+
+    sleep 2
+done
+
+echo "Timed out waiting for Selenium"
+exit 1

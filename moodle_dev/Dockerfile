@@ -2,6 +2,8 @@
 FROM moodlehq/moodle-php-apache:8.3
 MAINTAINER mattp pozze30@gmail.com
 
+ENV APACHE_DOCUMENT_ROOT=/var/www/html/public
+
 # Setup profiling requirements.
 RUN apt-get -y update
 RUN ACCEPT_EULA=Y apt-get upgrade -y
@@ -27,6 +29,7 @@ COPY assets/docker-php-ext-guzzle.ini /usr/local/etc/php/conf.d/docker-php-ext-g
 # SSL for Apache2
 COPY assets/certs/ /etc/ssl/certs/
 COPY assets/443-default.conf /etc/apache2/sites-enabled/443-default.conf
+COPY assets/apache2_moodle_router.conf /etc/apache2/conf-enabled/apache2_moodle_router.conf
 RUN a2enmod ssl
 
 COPY assets/certs/ /usr/local/share/ca-certificates/

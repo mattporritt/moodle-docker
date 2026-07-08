@@ -12,3 +12,4 @@ moodle_dev/assets/certs/*.pem
 moodle_dev/assets/certs/*.srl
 !keycloak/data/h2/README.md
 .DS_Store
+/_smoke_test/

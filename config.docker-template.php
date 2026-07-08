@@ -30,6 +30,7 @@ $CFG->debugdisplay = 1;
 $CFG->passwordpolicy = 0;
 $CFG->cronclionly = 0;
 $CFG->pathtophp = '/usr/local/bin/php';
+$CFG->routerconfigured = true;
 
 $CFG->phpunit_dataroot  = '/var/www/phpunitdata';
 $CFG->phpunit_prefix = 't_';

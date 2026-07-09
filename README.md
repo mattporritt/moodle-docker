@@ -309,10 +309,10 @@ If you prefer the raw commands, parallel mode is still just Moodle's native para
 `./bin/moodle-docker-compose exec webserver php public/admin/tool/behat/cli/init.php --parallel=4`<br/>
 `./bin/moodle-docker-compose exec -u www-data webserver php public/admin/tool/behat/cli/run.php --tags='@javascript'`
 
-# Mailhog
-MailHog is an email-testing tool with a fake SMTP server underneath. It encapsulates the SMTP protocol with extensions and does not require specific backend implementations. MailHog runs a super simple SMTP server that hogs outgoing emails sent to it. You can see the hogged emails in a web interface.
+# Mailpit
+Mailpit is an email-testing tool with a fake SMTP server underneath. It captures outgoing emails sent to it and provides a web interface for viewing them during development and tests.
 
-To access mailhog:<br/>
+To access Mailpit:<br/>
 http://webserver:1234/_/mail
 
 # Useful Docker Commands

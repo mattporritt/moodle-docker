@@ -38,7 +38,7 @@ services:
       KEYCLOAK_ADMIN: "${KEYCLOAK_ADMIN}"
       KEYCLOAK_ADMIN_PASSWORD: "${KEYCLOAK_ADMIN_PASSWORD}"
     healthcheck:
-      test: [ "CMD", "curl", "-f", "-k", "https://keycloak:8443/realms/moodle/.well-known/openid-configuration" ]
+      test: [ "CMD-SHELL", "exec 3<>/dev/tcp/keycloak/8080; printf 'GET /realms/moodle/.well-known/openid-configuration HTTP/1.1\\r\\nHost: keycloak\\r\\nConnection: close\\r\\n\\r\\n' >&3; grep -q 'HTTP/1.1 200' <&3" ]
       interval: 30s
       timeout: 10s
       retries: 5

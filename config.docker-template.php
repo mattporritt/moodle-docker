@@ -17,7 +17,7 @@ $CFG->wwwroot   = "https://webserver";
 $CFG->dataroot  = '/var/www/moodledata';
 $CFG->admin     = 'admin';
 $CFG->directorypermissions = 0777;
-$CFG->smtphosts = 'mailhog:1025';
+$CFG->smtphosts = 'mailpit:1025';
 $CFG->noreplyaddress = 'noreply@example.com';
 
 // Debug options - possible to be controlled by flag in future..

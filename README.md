@@ -19,6 +19,8 @@ For Matrix-synapase Mock, there will not be any settings needed and will be avai
 
 The entire setup process should take about: 45 minutes
 
+Already set up? See [QUICKSTART.md](QUICKSTART.md) for the day-to-day command reference: starting/tearing down individual instances, installing Moodle, and adding a new parallel instance (e.g. `moodle3`).
+
 # MacOS Host Setup
 These are the steps that need to be done to set up the development environment on a MacOS based machine.
 ## Homebrew Setup
@@ -260,6 +262,8 @@ Once the above steps are complete the sites can be accessed at the following URL
 
 # Multiple Instances
 One moodle-docker checkout can run several independent container groups ("instances") at the same time, one per Moodle code checkout. This allows multiple agents or developers to each work on their own issue, in their own checkout, with their own containers, database, Keycloak, and browser-reachable URLs — in parallel.
+
+For a copy-paste command reference (start/stop/teardown, install, adding an instance), see [QUICKSTART.md](QUICKSTART.md). The rest of this section explains the model and the full setup walkthrough.
 
 ## How it works
 * Each instance is named after its Moodle checkout folder: `~/projects/moodle2` → instance `moodle2`, compose project `moodlemaster2`, hostnames `webserver2` and `keycloak2`.

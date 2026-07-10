@@ -46,7 +46,7 @@ Do not commit `.env`, generated certificates, local database state, generated Mo
 
 ### Multiple instances
 
-This checkout can drive several independent container groups at once — one per Moodle checkout — so multiple agents can work in parallel without interfering. See "Multiple Instances" in the README for the full model. Summary:
+This checkout can drive several independent container groups at once — one per Moodle checkout — so multiple agents can work in parallel without interfering. See "Multiple Instances" in the README for the full model and QUICKSTART.md for the day-to-day command reference (start/teardown/install per instance, new-instance setup). Summary:
 
 - `MOODLE_DOCKER_INSTANCE=<name>` selects an instance. The bin scripts load `.env`, then overlay `instances/<name>/.env` on top (overlay wins). Unset, or set to the default checkout's basename, means the base `.env` — identical to the historical single-instance behaviour.
 - Instance names are the Moodle checkout folder basename (`~/projects/moodle2` → `moodle2` → project `moodlemaster2`, hostnames `webserver2`/`keycloak2`, bind IP `127.0.0.2`, subnet `172.32.239.0/24`).

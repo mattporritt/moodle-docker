@@ -13,7 +13,10 @@ $CFG->dbpass    = getenv('MOODLE_DOCKER_DBPASS');
 $CFG->prefix    = 'm_';
 $CFG->dboptions = ['dbcollation' => getenv('MOODLE_DOCKER_DBCOLLATION')];
 
-$CFG->wwwroot   = "https://webserver";
+// Per-instance web hostname (e.g. webserver2) passed in by docker compose.
+$webhostname = getenv('MOODLE_DOCKER_WEB_HOSTNAME') ?: 'webserver';
+
+$CFG->wwwroot   = "https://{$webhostname}";
 $CFG->dataroot  = '/var/www/moodledata';
 $CFG->admin     = 'admin';
 $CFG->directorypermissions = 0777;
@@ -43,7 +46,7 @@ $behatwebdriverhost = ($behatmode === 'parallel')
     ? 'http://selenium-hub:4444/wd/hub'
     : 'http://selenium:4444/wd/hub';
 
-$CFG->behat_wwwroot   = 'http://webserver';
+$CFG->behat_wwwroot   = "http://{$webhostname}";
 $CFG->behat_dataroot  = '/var/www/behatdata';
 $CFG->behat_prefix = 'b_';
 $CFG->behat_profiles = array(

@@ -1,0 +1,395 @@
+#!/usr/bin/env bash
+# Manage additional moodle-docker instances so multiple Moodle checkouts can
+# run their own container groups in parallel.
+#
+# Each instance gets:
+#   - instances/<name>/.env             overlay loaded on top of the base .env
+#   - instances/<name>/certs/           TLS leaf certs (signed by the shared CA)
+#   - instances/<name>/keycloak/data/   private Keycloak state + realm import
+#   - instances/<name>/loopback.plist   optional launchd daemon for the loopback alias
+#
+# Instances are selected at runtime with MOODLE_DOCKER_INSTANCE=<name>, which the
+# bin scripts resolve via bin/moodle-docker-env.sh. The default instance (the one
+# described by the base .env) is untouched and keeps 127.0.0.1 / webserver / keycloak.
+set -Eeuo pipefail
+
+thisfile=$( readlink "${BASH_SOURCE[0]}" ) || thisfile="${BASH_SOURCE[0]}"
+basedir="$( cd "$( dirname "$thisfile" )/../" && pwd -P )"
+
+CERTSRC="${basedir}/moodle_dev/assets/certs"
+INSTANCEDIR="${basedir}/instances"
+
+usage() {
+    cat <<EOF
+Usage: moodle-docker-instance <command> [args]
+
+Commands:
+  create <moodle-checkout-path> [--index N] [--apply-network]
+        Scaffold a new instance named after the checkout folder's basename.
+        --index N          force loopback/subnet index (default: next free)
+        --apply-network    run the sudo ifconfig/hosts steps instead of printing them
+  list
+        Show all instances (including the default one from .env).
+  rm <name> [--purge]
+        Stop the instance's containers and delete instances/<name>/.
+        --purge also removes the instance's docker volumes.
+  network-setup <name> [--apply]
+        Print (or apply with --apply) the loopback alias + /etc/hosts steps.
+EOF
+    exit 1
+}
+
+# Read a KEY=VALUE var from an env file.
+read_var() { # file key
+    sed -n "s/^$2=//p" "$1" | tail -n1
+}
+
+default_instance_name() {
+    basename "$(read_var "${basedir}/.env" MOODLE_DOCKER_WWWROOT)"
+}
+
+# Derive the naming suffix for an instance: moodle2 -> "2", otherwise "-<name>".
+instance_suffix() { # name
+    local name="$1"
+    local sfx="${name#moodle}"
+    if [ -z "${sfx}" ] || [ "${sfx}" = "${name}" ]; then
+        sfx="-${name}"
+    fi
+    echo "${sfx}"
+}
+
+# Find the next free loopback index. The default instance owns 1 (127.0.0.1).
+next_index() {
+    local max=1 ip n
+    if [ -d "${INSTANCEDIR}" ]; then
+        for envfile in "${INSTANCEDIR}"/*/.env; do
+            [ -f "${envfile}" ] || continue
+            ip="$(read_var "${envfile}" MOODLE_DOCKER_BIND_IP)"
+            n="${ip##*.}"
+            if [[ "${n}" =~ ^[0-9]+$ ]] && [ "${n}" -gt "${max}" ]; then
+                max="${n}"
+            fi
+        done
+    fi
+    echo $((max + 1))
+}
+
+# Prompt once for the CA key passphrase when the key is encrypted; reused for
+# every leaf-cert signing in this run. Sets CA_PASS_ARGS.
+CA_PASS_ARGS=()
+read_ca_passphrase() {
+    if grep -q ENCRYPTED "${CERTSRC}/ca.key"; then
+        local capass
+        read -r -s -p "Passphrase for ${CERTSRC}/ca.key: " capass
+        echo
+        CA_PASS_ARGS=(-passin "pass:${capass}")
+    fi
+}
+
+# Generate a leaf certificate signed by the shared CA.
+# The output file name is canonical (webserver/keycloak) so the baked-in Apache
+# vhost and keycloak.conf paths keep working; only the SAN differs per instance.
+generate_cert() { # hostname outdir outname
+    local host="$1" outdir="$2" outname="$3"
+    local extfile="${outdir}/${outname}.ext"
+
+    openssl genrsa -out "${outdir}/${outname}.key" 2048 2>/dev/null
+    openssl req -new -key "${outdir}/${outname}.key" \
+        -out "${outdir}/${outname}.csr" -subj "/CN=${host}"
+    cat > "${extfile}" <<EOF
+authorityKeyIdentifier=keyid,issuer
+basicConstraints=CA:FALSE
+keyUsage = digitalSignature, nonRepudiation, keyEncipherment, dataEncipherment
+subjectAltName = @alt_names
+[alt_names]
+DNS.1 = ${host}
+EOF
+    echo "Signing certificate for ${host}"
+    openssl x509 -req -in "${outdir}/${outname}.csr" \
+        -CA "${CERTSRC}/ca.pem" -CAkey "${CERTSRC}/ca.key" -CAcreateserial \
+        ${CA_PASS_ARGS[@]+"${CA_PASS_ARGS[@]}"} \
+        -out "${outdir}/${outname}.crt" -days 825 -sha256 -extfile "${extfile}"
+}
+
+write_plist() { # name bindip outfile
+    local name="$1" bindip="$2" outfile="$3"
+    cat > "${outfile}" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.moodledocker.loopback.${name}</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/sbin/ifconfig</string>
+        <string>lo0</string>
+        <string>alias</string>
+        <string>${bindip}</string>
+        <string>up</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+</dict>
+</plist>
+EOF
+}
+
+print_network_steps() { # name bindip webhost kchost
+    local name="$1" bindip="$2" webhost="$3" kchost="$4"
+    cat <<EOF
+
+Network setup for instance '${name}' (requires sudo):
+
+  1. Add the loopback alias (needed again after each reboot unless the
+     launchd daemon below is installed):
+       sudo ifconfig lo0 alias ${bindip} up
+
+  2. Add the hostnames to /etc/hosts:
+       sudo sh -c 'echo "${bindip}       ${webhost} ${kchost}" >> /etc/hosts'
+
+  3. Optional - make the loopback alias survive reboots:
+       sudo cp ${INSTANCEDIR}/${name}/loopback.plist /Library/LaunchDaemons/com.moodledocker.loopback.${name}.plist
+       sudo launchctl load /Library/LaunchDaemons/com.moodledocker.loopback.${name}.plist
+EOF
+}
+
+apply_network_steps() { # bindip webhost kchost
+    local bindip="$1" webhost="$2" kchost="$3"
+    echo "Applying network setup (sudo required)..."
+    sudo ifconfig lo0 alias "${bindip}" up
+    if ! grep -qE "^${bindip}[[:space:]]" /etc/hosts; then
+        sudo sh -c "echo '${bindip}       ${webhost} ${kchost}' >> /etc/hosts"
+        echo "Added '${bindip} ${webhost} ${kchost}' to /etc/hosts"
+    else
+        echo "/etc/hosts already has an entry for ${bindip}; not modifying it."
+    fi
+}
+
+cmd_create() {
+    local checkout="" index="" applynetwork=0
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --index) index="$2"; shift 2 ;;
+            --apply-network) applynetwork=1; shift ;;
+            -*) echo "Unknown option: $1" >&2; usage ;;
+            *) checkout="$1"; shift ;;
+        esac
+    done
+    [ -n "${checkout}" ] || usage
+
+    if [ ! -d "${checkout}" ]; then
+        echo "Error: '${checkout}' is not an existing directory." >&2
+        exit 1
+    fi
+    checkout="$( cd "${checkout}" && pwd -P )"
+    local name
+    name="$(basename "${checkout}")"
+
+    if [[ ! "${name}" =~ ^[a-z0-9][a-z0-9_-]*$ ]]; then
+        echo "Error: instance name '${name}' must be lowercase alphanumeric (plus - or _)." >&2
+        exit 1
+    fi
+    if [ "${name}" = "$(default_instance_name)" ]; then
+        echo "Error: '${name}' is the default instance (base .env); nothing to create." >&2
+        exit 1
+    fi
+    if [ -d "${INSTANCEDIR}/${name}" ]; then
+        echo "Error: instance '${name}' already exists (${INSTANCEDIR}/${name})." >&2
+        exit 1
+    fi
+    if [ ! -f "${CERTSRC}/ca.pem" ] || [ ! -f "${CERTSRC}/ca.key" ]; then
+        echo "Error: shared CA not found in ${CERTSRC}." >&2
+        echo "Generate the default certs first - see 'SSL certificates' in the README." >&2
+        exit 1
+    fi
+
+    [ -n "${index}" ] || index="$(next_index)"
+    if [[ ! "${index}" =~ ^[0-9]+$ ]] || [ "${index}" -lt 2 ] || [ "${index}" -gt 254 ]; then
+        echo "Error: index must be a number between 2 and 254." >&2
+        exit 1
+    fi
+
+    local sfx bindip subnet gateway project webhost kchost idir
+    sfx="$(instance_suffix "${name}")"
+    bindip="127.0.0.${index}"
+    subnet="172.32.$((237 + index)).0/24"
+    gateway="172.32.$((237 + index)).1"
+    project="moodlemaster${sfx}"
+    webhost="webserver${sfx}"
+    kchost="keycloak${sfx}"
+    idir="${INSTANCEDIR}/${name}"
+
+    echo "Creating instance '${name}':"
+    echo "  checkout:   ${checkout}"
+    echo "  project:    ${project}"
+    echo "  bind IP:    ${bindip}"
+    echo "  subnet:     ${subnet}"
+    echo "  hostnames:  ${webhost}, ${kchost}"
+
+    read_ca_passphrase
+
+    # Remove partial state if anything below fails.
+    trap 'echo "Create failed - removing partial ${idir}" >&2; rm -rf "${idir}"' ERR
+
+    mkdir -p "${idir}/certs" "${idir}/keycloak/data/h2" \
+        "${idir}/keycloak/data/import" "${idir}/keycloak/data/transaction-logs"
+
+    cat > "${idir}/.env" <<EOF
+# moodle-docker instance overlay for '${name}'.
+# Loaded on top of the base .env when MOODLE_DOCKER_INSTANCE=${name}.
+# Generated by bin/moodle-docker-instance on $(date '+%Y-%m-%d').
+MOODLE_DOCKER_WWWROOT=${checkout}
+COMPOSE_PROJECT_NAME=${project}
+MOODLE_DOCKER_BIND_IP=${bindip}
+MOODLE_DOCKER_WEB_HOSTNAME=${webhost}
+MOODLE_DOCKER_KEYCLOAK_HOSTNAME=${kchost}
+MOODLE_DOCKER_SUBNET=${subnet}
+MOODLE_DOCKER_GATEWAY=${gateway}
+MOODLE_DOCKER_CERTS_DIR=${idir}/certs
+MOODLE_DOCKER_KEYCLOAK_DATA_DIR=${idir}/keycloak/data
+EOF
+
+    generate_cert "${webhost}" "${idir}/certs" "webserver"
+    generate_cert "${kchost}" "${idir}/certs" "keycloak"
+    # Keycloak serves TLS from this dir; give it the CA too so the chain is complete.
+    cp "${CERTSRC}/ca.pem" "${idir}/certs/ca.pem"
+
+    # Instance realm import: same realm, redirect URIs pointing at this instance.
+    sed "s|https://webserver|https://${webhost}|g" \
+        "${basedir}/keycloak/data/import/realm.json" \
+        > "${idir}/keycloak/data/import/realm.json"
+
+    write_plist "${name}" "${bindip}" "${idir}/loopback.plist"
+
+    trap - ERR
+
+    if [ "${applynetwork}" -eq 1 ]; then
+        apply_network_steps "${bindip}" "${webhost}" "${kchost}"
+        print_network_steps "${name}" "${bindip}" "${webhost}" "${kchost}" | sed -n '/Optional/,$p'
+    else
+        print_network_steps "${name}" "${bindip}" "${webhost}" "${kchost}"
+    fi
+
+    cat <<EOF
+
+Instance '${name}' created. Next steps:
+
+  1. Copy the Moodle config template into the checkout:
+       cp ${basedir}/config.docker-template.php ${checkout}/config.php
+
+  2. Start the containers:
+       MOODLE_DOCKER_INSTANCE=${name} ${basedir}/bin/moodle-docker-compose up -d
+     (the agent harness bin/ wrappers export MOODLE_DOCKER_INSTANCE automatically
+      based on their parent folder name)
+
+  3. Install Moodle as usual (site URL will be https://${webhost}).
+
+  4. If using Keycloak OAuth2, configure the issuer in this Moodle as:
+       https://${kchost}:8443/realms/moodle/
+EOF
+}
+
+cmd_list() {
+    local defname
+    defname="$(default_instance_name)"
+    printf '%-14s %-12s %-18s %-10s %s\n' NAME 'BIND IP' PROJECT RUNNING WWWROOT
+    local defproject
+    defproject="$(read_var "${basedir}/.env" COMPOSE_PROJECT_NAME)"
+    printf '%-14s %-12s %-18s %-10s %s\n' \
+        "${defname} (default)" "127.0.0.1" "${defproject}" \
+        "$(docker ps -q --filter "label=com.docker.compose.project=${defproject}" 2>/dev/null | wc -l | tr -d ' ')" \
+        "$(read_var "${basedir}/.env" MOODLE_DOCKER_WWWROOT)"
+    if [ -d "${INSTANCEDIR}" ]; then
+        for envfile in "${INSTANCEDIR}"/*/.env; do
+            [ -f "${envfile}" ] || continue
+            local iname iproject
+            iname="$(basename "$(dirname "${envfile}")")"
+            iproject="$(read_var "${envfile}" COMPOSE_PROJECT_NAME)"
+            printf '%-14s %-12s %-18s %-10s %s\n' \
+                "${iname}" \
+                "$(read_var "${envfile}" MOODLE_DOCKER_BIND_IP)" \
+                "${iproject}" \
+                "$(docker ps -q --filter "label=com.docker.compose.project=${iproject}" 2>/dev/null | wc -l | tr -d ' ')" \
+                "$(read_var "${envfile}" MOODLE_DOCKER_WWWROOT)"
+        done
+    fi
+}
+
+cmd_rm() {
+    local name="" purge=0
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --purge) purge=1; shift ;;
+            -*) echo "Unknown option: $1" >&2; usage ;;
+            *) name="$1"; shift ;;
+        esac
+    done
+    [ -n "${name}" ] || usage
+
+    local idir="${INSTANCEDIR}/${name}"
+    if [ ! -f "${idir}/.env" ]; then
+        echo "Error: no such instance '${name}' (${idir}/.env not found)." >&2
+        exit 1
+    fi
+
+    local bindip webhost kchost
+    bindip="$(read_var "${idir}/.env" MOODLE_DOCKER_BIND_IP)"
+    webhost="$(read_var "${idir}/.env" MOODLE_DOCKER_WEB_HOSTNAME)"
+    kchost="$(read_var "${idir}/.env" MOODLE_DOCKER_KEYCLOAK_HOSTNAME)"
+
+    local down_args=(down --remove-orphans)
+    [ "${purge}" -eq 1 ] && down_args+=(-v)
+    echo "Stopping containers for instance '${name}'..."
+    MOODLE_DOCKER_INSTANCE="${name}" "${basedir}/bin/moodle-docker-compose" "${down_args[@]}" || true
+
+    rm -rf "${idir}"
+    echo "Removed ${idir}."
+
+    cat <<EOF
+
+To undo the network setup (requires sudo):
+  sudo ifconfig lo0 -alias ${bindip}
+  Remove the '${bindip} ${webhost} ${kchost}' line from /etc/hosts.
+  If the launchd daemon was installed:
+    sudo launchctl unload /Library/LaunchDaemons/com.moodledocker.loopback.${name}.plist
+    sudo rm /Library/LaunchDaemons/com.moodledocker.loopback.${name}.plist
+EOF
+}
+
+cmd_network_setup() {
+    local name="" apply=0
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --apply) apply=1; shift ;;
+            -*) echo "Unknown option: $1" >&2; usage ;;
+            *) name="$1"; shift ;;
+        esac
+    done
+    [ -n "${name}" ] || usage
+
+    local idir="${INSTANCEDIR}/${name}"
+    if [ ! -f "${idir}/.env" ]; then
+        echo "Error: no such instance '${name}' (${idir}/.env not found)." >&2
+        exit 1
+    fi
+    local bindip webhost kchost
+    bindip="$(read_var "${idir}/.env" MOODLE_DOCKER_BIND_IP)"
+    webhost="$(read_var "${idir}/.env" MOODLE_DOCKER_WEB_HOSTNAME)"
+    kchost="$(read_var "${idir}/.env" MOODLE_DOCKER_KEYCLOAK_HOSTNAME)"
+    if [ "${apply}" -eq 1 ]; then
+        apply_network_steps "${bindip}" "${webhost}" "${kchost}"
+    else
+        print_network_steps "${name}" "${bindip}" "${webhost}" "${kchost}"
+    fi
+}
+
+command="${1:-}"
+[ $# -gt 0 ] && shift
+case "${command}" in
+    create) cmd_create "$@" ;;
+    list) cmd_list "$@" ;;
+    rm) cmd_rm "$@" ;;
+    network-setup) cmd_network_setup "$@" ;;
+    *) usage ;;
+esac

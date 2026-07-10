@@ -7,8 +7,9 @@ set -e
 thisfile=$( readlink "${BASH_SOURCE[0]}" ) || thisfile="${BASH_SOURCE[0]}"
 basedir="$( cd "$( dirname "$thisfile" )/../" && pwd -P )"
 
-#Import the environment variables.
-export $(grep -v '^#' "${basedir}/.env" | xargs)
+#Import the environment variables (base .env plus optional instance overlay).
+source "${basedir}/bin/moodle-docker-env.sh"
+moodle_docker_load_env "${basedir}"
 
 if [ ! -d "$MOODLE_DOCKER_WWWROOT" ];
 then
@@ -54,13 +55,16 @@ fi
 
 # Support PHP version overrides for DB not available any more.
 
+# Bind IP for published ports (per-instance loopback alias, e.g. 127.0.0.2).
+export MOODLE_DOCKER_BIND_IP=${MOODLE_DOCKER_BIND_IP:-127.0.0.1}
+
 # Expose DB port if requested.
 if [[ $MOODLE_DOCKER_DB_PORT == *":"* ]] || [[ $MOODLE_DOCKER_DB_PORT -gt 0 ]]
 then
-    # If no bind ip has been configured (bind_ip:port), default to 127.0.0.1
+    # If no bind ip has been configured (bind_ip:port), default to the instance bind IP.
     if [[ ! $MOODLE_DOCKER_DB_PORT == *":"* ]]
     then
-        export MOODLE_DOCKER_DB_PORT=127.0.0.1:$MOODLE_DOCKER_DB_PORT
+        export MOODLE_DOCKER_DB_PORT=$MOODLE_DOCKER_BIND_IP:$MOODLE_DOCKER_DB_PORT
     fi
     filename="${basedir}/db.${MOODLE_DOCKER_DB}.port.yml"
     if [ -f $filename ];
@@ -204,10 +208,10 @@ then
         export MOODLE_DOCKER_SELENIUM_SUFFIX="-debug"
     fi
 
-    # If no bind ip has been configured (bind_ip:port), default to 127.0.0.1
+    # If no bind ip has been configured (bind_ip:port), default to the instance bind IP.
     if [[ ! $MOODLE_DOCKER_SELENIUM_VNC_PORT == *":"* ]]
     then
-        MOODLE_DOCKER_SELENIUM_VNC_PORT=127.0.0.1:$MOODLE_DOCKER_SELENIUM_VNC_PORT
+        MOODLE_DOCKER_SELENIUM_VNC_PORT=$MOODLE_DOCKER_BIND_IP:$MOODLE_DOCKER_SELENIUM_VNC_PORT
     fi
     dockercompose="${dockercompose} -f ${basedir}/selenium.debug.yml"
 fi
@@ -257,10 +261,10 @@ export MOODLE_DOCKER_WEB_HOST=${MOODLE_DOCKER_WEB_HOST:-localhost}
 export MOODLE_DOCKER_WEB_PORT=${MOODLE_DOCKER_WEB_PORT:-8000}
 if [[ $MOODLE_DOCKER_WEB_PORT == *":"* ]] || [[ $MOODLE_DOCKER_WEB_PORT -gt 0 ]]
 then
-    # If no bind ip has been configured (bind_ip:port), default to 127.0.0.1
+    # If no bind ip has been configured (bind_ip:port), default to the instance bind IP.
     if [[ ! $MOODLE_DOCKER_WEB_PORT == *":"* ]]
     then
-        MOODLE_DOCKER_WEB_PORT=127.0.0.1:$MOODLE_DOCKER_WEB_PORT
+        MOODLE_DOCKER_WEB_PORT=$MOODLE_DOCKER_BIND_IP:$MOODLE_DOCKER_WEB_PORT
     fi
     dockercompose="${dockercompose} -f ${basedir}/webserver.port.yml"
 fi

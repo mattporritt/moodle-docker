@@ -6,6 +6,10 @@ services:
     volumes:
       - "${MOODLE_DOCKER_WWWROOT}:/var/www/html"
       - "${ASSETDIR}/web/apache2_faildumps.conf:/etc/apache2/conf-enabled/apache2_faildumps.conf"
+      # Instance TLS leaf certs mounted as individual files so the image's
+      # baked-in CA bundle (/etc/ssl/certs/ca-certificates.crt) stays visible.
+      - "${MOODLE_DOCKER_CERTS_DIR:-./moodle_dev/assets/certs}/webserver.crt:/etc/ssl/certs/webserver.crt"
+      - "${MOODLE_DOCKER_CERTS_DIR:-./moodle_dev/assets/certs}/webserver.key:/etc/ssl/certs/webserver.key"
     tmpfs:
       - /muc
     environment:
@@ -16,9 +20,14 @@ services:
       MOODLE_DOCKER_BEHAT_MODE: "${MOODLE_DOCKER_BEHAT_MODE}"
       MOODLE_DOCKER_BEHAT_PARALLEL: "${MOODLE_DOCKER_BEHAT_PARALLEL}"
       MOODLE_DOCKER_WEB_HOST: "${MOODLE_DOCKER_WEB_HOST}"
+      MOODLE_DOCKER_WEB_HOSTNAME: "${MOODLE_DOCKER_WEB_HOSTNAME:-webserver}"
       PHP_IDE_CONFIG: "serverName=moodle-local"
     ports:
-      - "443:443"
+      - "${MOODLE_DOCKER_BIND_IP:-127.0.0.1}:443:443"
+    networks:
+      default:
+        aliases:
+          - "${MOODLE_DOCKER_WEB_HOSTNAME:-webserver}"
   exttests:
     image: moodlehq/moodle-exttests
     volumes:
@@ -28,12 +37,16 @@ services:
     image: quay.io/keycloak/keycloak:latest
     entrypoint: ["/opt/keycloak/bin/kc.sh", "start-dev", "--import-realm"]
     volumes:
-      - "./keycloak/data:/opt/keycloak/data"
+      - "${MOODLE_DOCKER_KEYCLOAK_DATA_DIR:-./keycloak/data}:/opt/keycloak/data"
       - "./keycloak/keycloak.conf:/opt/keycloak/conf/keycloak.conf"
-      - "./moodle_dev/assets/certs/:/etc/ssl/certs/"
+      - "${MOODLE_DOCKER_CERTS_DIR:-./moodle_dev/assets/certs}/:/etc/ssl/certs/"
     ports:
-      - 8080:8080
-      - 8443:8443
+      - "${MOODLE_DOCKER_BIND_IP:-127.0.0.1}:8080:8080"
+      - "${MOODLE_DOCKER_BIND_IP:-127.0.0.1}:8443:8443"
+    networks:
+      default:
+        aliases:
+          - "${MOODLE_DOCKER_KEYCLOAK_HOSTNAME:-keycloak}"
     environment:
       KEYCLOAK_ADMIN: "${KEYCLOAK_ADMIN}"
       KEYCLOAK_ADMIN_PASSWORD: "${KEYCLOAK_ADMIN_PASSWORD}"
@@ -47,5 +60,5 @@ networks:
     ipam:
       driver: default
       config:
-        - subnet: 172.32.238.0/24
-          gateway: 172.32.238.1
+        - subnet: "${MOODLE_DOCKER_SUBNET:-172.32.238.0/24}"
+          gateway: "${MOODLE_DOCKER_GATEWAY:-172.32.238.1}"

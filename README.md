@@ -258,6 +258,61 @@ Once the above steps are complete the sites can be accessed at the following URL
 * Mailhog: http://webserver:1234/_/mail
 * Matrix-synapase Mock: http://elementmock:8001
 
+# Multiple Instances
+One moodle-docker checkout can run several independent container groups ("instances") at the same time, one per Moodle code checkout. This allows multiple agents or developers to each work on their own issue, in their own checkout, with their own containers, database, Keycloak, and browser-reachable URLs — in parallel.
+
+## How it works
+* Each instance is named after its Moodle checkout folder: `~/projects/moodle2` → instance `moodle2`, compose project `moodlemaster2`, hostnames `webserver2` and `keycloak2`.
+* The base `.env` describes the default instance (`~/projects/moodle`, project `moodlemaster`, hostnames `webserver`/`keycloak`) and is unchanged.
+* Extra instances live in `instances/<name>/` (gitignored): an `.env` overlay, per-instance TLS certs, and private Keycloak state.
+* Instance selection happens through the `MOODLE_DOCKER_INSTANCE` environment variable. The bin scripts load the base `.env`, then overlay `instances/$MOODLE_DOCKER_INSTANCE/.env` on top. When the variable is unset (or names the default instance) behaviour is identical to a single-instance setup. The agent harness wrappers (claude/codex/copilot/gemini `bin/*`) export it automatically from their checkout folder name.
+* **Networking:** every instance binds its published ports to its own loopback IP — the default instance owns `127.0.0.1`, instance 2 owns `127.0.0.2`, and so on. Because each instance has its own IP, all instances keep the *same* ports (443, 8080, 8443, 1234, 5433). `/etc/hosts` maps each instance's hostnames to its IP. This keeps URLs identical inside and outside Docker (e.g. `https://keycloak2:8443` works from your browser *and* from the Moodle container), which is what makes Keycloak OIDC issuer URLs consistent — a requirement for SSO. Inside Docker, each instance gets its own network and subnet (`172.32.238.0/24`, `172.32.239.0/24`, ...), and the webserver/keycloak services carry their instance hostname as a network alias.
+* TLS certs for new instances are signed by the same root CA you already trust, so no extra browser/keychain setup is needed.
+* All instances share the `mattp:moodle_dev` image — no per-instance rebuild.
+
+Note: as part of this work, all published ports now bind to the instance's loopback IP instead of `0.0.0.0`. If anything on your LAN was connecting to these services, it no longer can.
+
+## Creating an instance
+1. Clone Moodle into a new folder and add the config template:
+```
+git clone git@github.com:moodle/moodle.git ~/projects/moodle2
+cp ~/projects/moodle-docker/config.docker-template.php ~/projects/moodle2/config.php
+```
+(The config template derives the site URL from the instance's hostname automatically — no editing needed.)
+
+2. Scaffold the instance (from the moodle-docker checkout):
+```
+bin/moodle-docker-instance create ~/projects/moodle2
+```
+This writes `instances/moodle2/.env`, generates the TLS certs (you will be asked for the root CA passphrase), prepares a private Keycloak data directory with the realm redirect URLs rewritten for `webserver2`, and prints the network setup commands.
+
+3. Apply the network setup (needs sudo — either run the printed commands, or pass `--apply-network` to the create command):
+```
+sudo ifconfig lo0 alias 127.0.0.2 up
+sudo sh -c 'echo "127.0.0.2       webserver2 keycloak2" >> /etc/hosts'
+```
+The loopback alias does not survive a reboot on macOS. To make it persistent, install the generated launchd daemon:
+```
+sudo cp instances/moodle2/loopback.plist /Library/LaunchDaemons/com.moodledocker.loopback.moodle2.plist
+sudo launchctl load /Library/LaunchDaemons/com.moodledocker.loopback.moodle2.plist
+```
+(Re-print these steps any time with `bin/moodle-docker-instance network-setup moodle2`.)
+
+4. Start and install as usual, selecting the instance:
+```
+MOODLE_DOCKER_INSTANCE=moodle2 bin/moodle-docker-compose up -d
+MOODLE_DOCKER_INSTANCE=moodle2 bin/moodle-docker-compose exec webserver php public/admin/cli/install_database.php --agree-license --fullname="Moodle 2" --shortname="docker_moodle2" --summary="Moodle dev site" --adminpass="test" --adminemail="you@gmail.com"
+```
+The site is now at https://webserver2/ and Keycloak at https://keycloak2:8443/. If you use the agent harnesses, clone the wanted agent repo into `~/projects/moodle2/<agent>` and its `./bin/*` commands will target this instance automatically.
+
+If configuring Keycloak SSO for this instance, use `https://keycloak2:8443/realms/moodle/` as the issuer/service base URL (i.e. this instance's Keycloak hostname).
+
+## Managing instances
+* `bin/moodle-docker-instance list` — all instances, their IPs, projects, and running container counts.
+* `bin/moodle-docker-instance rm moodle2` — stop the containers and delete the instance state (`--purge` also removes its docker volumes). Prints the commands to undo the network setup.
+* Host database access is per-IP: `psql -h 127.0.0.2 -p 5433 -U moodle` reaches instance 2's database, `-h 127.0.0.1` the default instance's.
+* Behat/PHPUnit work per instance exactly as before; just set `MOODLE_DOCKER_INSTANCE` (or use the harness wrappers): `MOODLE_DOCKER_INSTANCE=moodle2 bin/behat-init serial`.
+
 # PHP Unit Tests
 Running unit tests in the docker container is very similar to running them from the command line in a VM.
 To initialise phpunit environment:<br/>
@@ -320,7 +375,8 @@ To access the container directly:<br/>
 `./moodle-docker-compose exec -it webserver /bin/bash`
 
 To get container logs (which include apache logs for webserver container:<br/>
-`docker logs -f moodlemaster-webserver-1`
+`docker logs -f moodlemaster-webserver-1`<br/>
+(Container names are prefixed with the instance's compose project name — e.g. `moodlemaster2-webserver-1` for instance `moodle2`.)
 
 To shut things down:<br/>
 `./moodle-docker-compose down`
@@ -344,3 +400,11 @@ When you change them, use `bin/moodle-docker-compose down && bin/moodle-docker-c
 | `MOODLE_DOCKER_MATRIX_MOCK`               | no        | any value                             | not set       | If set, matrix test mock server is added                                     |
 | `MOODLE_DOCKER_BEHAT_MODE`               | no        | `serial`, `parallel`                  | `serial`      | Selects standalone Selenium or Selenium Grid for Behat                       |
 | `MOODLE_DOCKER_BEHAT_PARALLEL`           | no        | positive integer                      | `4`           | Default parallel worker count for Behat Grid mode                            |
+| `MOODLE_DOCKER_INSTANCE`                 | no        | instance name                         | not set       | Selects an instance overlay from `instances/<name>/.env` (see Multiple Instances) |
+| `MOODLE_DOCKER_BIND_IP`                  | no        | loopback IP                           | `127.0.0.1`   | Host IP that all published ports bind to (per-instance loopback alias)       |
+| `MOODLE_DOCKER_WEB_HOSTNAME`             | no        | hostname                              | `webserver`   | Instance web hostname; network alias and `$CFG->wwwroot` host                |
+| `MOODLE_DOCKER_KEYCLOAK_HOSTNAME`        | no        | hostname                              | `keycloak`    | Instance Keycloak hostname; network alias                                    |
+| `MOODLE_DOCKER_SUBNET`                   | no        | CIDR subnet                           | `172.32.238.0/24` | Docker network subnet for the instance                                   |
+| `MOODLE_DOCKER_GATEWAY`                  | no        | IP address                            | `172.32.238.1`| Docker network gateway for the instance                                      |
+| `MOODLE_DOCKER_CERTS_DIR`                | no        | path                                  | `./moodle_dev/assets/certs` | Directory holding the instance's TLS leaf certs                 |
+| `MOODLE_DOCKER_KEYCLOAK_DATA_DIR`        | no        | path                                  | `./keycloak/data` | Directory holding the instance's Keycloak state and realm import         |

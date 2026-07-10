@@ -14,7 +14,8 @@ if [[ "$mode" != "serial" && "$mode" != "parallel" ]]; then
     exit 1
 fi
 
-export $(grep -v '^#' "${basedir}/.env" | xargs)
+source "${basedir}/bin/moodle-docker-env.sh"
+moodle_docker_load_env "${basedir}"
 export MOODLE_DOCKER_BEHAT_MODE="$mode"
 export MOODLE_DOCKER_BEHAT_PARALLEL="${MOODLE_DOCKER_BEHAT_PARALLEL:-4}"
 

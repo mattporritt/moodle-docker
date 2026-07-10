@@ -4,6 +4,9 @@ set -e
 thisfile=$( readlink "${BASH_SOURCE[0]}" ) || thisfile="${BASH_SOURCE[0]}"
 basedir="$( cd "$( dirname "$thisfile" )/../" && pwd -P )"
 
+source "${basedir}/bin/moodle-docker-env.sh"
+moodle_docker_load_env "${basedir}"
+
 if [ -z "$MOODLE_DOCKER_DB" ];
 then
     echo 'Error: $MOODLE_DOCKER_DB is not set'

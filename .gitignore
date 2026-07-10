@@ -1,6 +1,7 @@
 local.yml
 .idea/
 .env
+instances/
 homeserver.db
 media_store/
 keycloak/data/h2/

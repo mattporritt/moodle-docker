@@ -8,7 +8,9 @@ This repository is a Docker Compose based Moodle development and test environmen
 
 Important components:
 
-- `bin/moodle-docker-compose` builds the effective Docker Compose command from `.env`, required compose fragments, optional service fragments, and `local.yml` if present.
+- `bin/moodle-docker-compose` builds the effective Docker Compose command from `.env` (plus an optional per-instance overlay), required compose fragments, optional service fragments, and `local.yml` if present.
+- `bin/moodle-docker-env.sh` is the shared environment loader: it sources `.env`, then overlays `instances/$MOODLE_DOCKER_INSTANCE/.env` when a non-default instance is selected.
+- `bin/moodle-docker-instance` scaffolds, lists, and removes additional instances (parallel container groups bound to separate Moodle checkouts).
 - `base.yml` defines the custom Moodle webserver, database dependency, external test files service, Keycloak, and the default network.
 - `db.*.yml` and `db.*.port.yml` select database engines and optional host port exposure.
 - `selenium.*.yml` and `selenium.grid.yml` select browser test services for Behat.
@@ -40,7 +42,17 @@ Common optional variables:
 - `MOODLE_DOCKER_BEHAT_PARALLEL`: node count for parallel Firefox Behat.
 - `MOODLE_DOCKER_MATRIX_MOCK`, `MOODLE_DOCKER_BBB_MOCK`, `MOODLE_DOCKER_MLBACKEND`, `MOODLE_DOCKER_PHPUNIT_EXTERNAL_SERVICES`: enable optional service fragments.
 
-Do not commit `.env`, generated certificates, local database state, or generated Moodle checkouts.
+Do not commit `.env`, generated certificates, local database state, generated Moodle checkouts, or anything under `instances/`.
+
+### Multiple instances
+
+This checkout can drive several independent container groups at once — one per Moodle checkout — so multiple agents can work in parallel without interfering. See "Multiple Instances" in the README for the full model. Summary:
+
+- `MOODLE_DOCKER_INSTANCE=<name>` selects an instance. The bin scripts load `.env`, then overlay `instances/<name>/.env` on top (overlay wins). Unset, or set to the default checkout's basename, means the base `.env` — identical to the historical single-instance behaviour.
+- Instance names are the Moodle checkout folder basename (`~/projects/moodle2` → `moodle2` → project `moodlemaster2`, hostnames `webserver2`/`keycloak2`, bind IP `127.0.0.2`, subnet `172.32.239.0/24`).
+- Per-instance variables (all default to the historical values, so omitting them is safe): `MOODLE_DOCKER_BIND_IP` (host IP the published ports bind to), `MOODLE_DOCKER_WEB_HOSTNAME` / `MOODLE_DOCKER_KEYCLOAK_HOSTNAME` (network aliases and, for the web hostname, the `$CFG->wwwroot` host via a container env var), `MOODLE_DOCKER_SUBNET` / `MOODLE_DOCKER_GATEWAY`, `MOODLE_DOCKER_CERTS_DIR`, `MOODLE_DOCKER_KEYCLOAK_DATA_DIR`.
+- Ports (443, 8080, 8443, web, DB) are intentionally the same across instances; the per-instance loopback bind IP is what isolates them. Do not give instances different ports — identical inside/outside URLs are required for Keycloak OIDC.
+- Create instances with `bin/moodle-docker-instance create <checkout-path>`; never share `keycloak/data` or an `instances/<name>/keycloak` directory between two running instances (H2 state corrupts).
 
 ## Local Operation
 

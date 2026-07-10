@@ -32,5 +32,8 @@ COPY assets/443-default.conf /etc/apache2/sites-enabled/443-default.conf
 COPY assets/apache2_moodle_router.conf /etc/apache2/conf-enabled/apache2_moodle_router.conf
 RUN a2enmod ssl
 
-COPY assets/certs/ /usr/local/share/ca-certificates/
+# Trust the shared root CA so PHP/curl in the container can verify every
+# service cert it signed, including per-instance certs mounted at runtime.
+# (update-ca-certificates only processes .crt files, hence the rename.)
+COPY assets/certs/ca.pem /usr/local/share/ca-certificates/moodle-docker-ca.crt
 RUN update-ca-certificates

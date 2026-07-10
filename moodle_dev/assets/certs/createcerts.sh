@@ -12,10 +12,11 @@ FILE=ca.key
 if [ -f "$FILE" ]; then
     echo "Using existing CA private key"
 else
-    # Generate the private key for the CA:
+    # Generate the private key for the CA (unencrypted - this is a local dev CA,
+    # and an encrypted key means a passphrase prompt on every cert signing,
+    # including bin/moodle-docker-instance create):
     echo "Generating the private key for the CA"
-    echo "Take note of the private key pass phrase"
-    openssl genrsa -des3 -out ca.key 2048 #Take note of the PEM password
+    openssl genrsa -out ca.key 2048
 fi
 
 FILE=ca.pem

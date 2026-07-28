@@ -3,7 +3,7 @@ services:
     environment:
       MOODLE_DOCKER_DBTYPE: pgsql
   db:
-    image: postgres:${MOODLE_DOCKER_DB_VERSION:-16}
+    image: postgres:${MOODLE_DOCKER_DB_VERSION:-17}
     shm_size: 4g
     environment:
       POSTGRES_USER: "${MOODLE_DOCKER_DBUSER}"

@@ -185,6 +185,14 @@ https://addons.mozilla.org/en-US/firefox/addon/xdebug-helper-for-firefox/
 
 Once installed you can enable and disable debugging from Firefox (providing PHP storm is listening.
 
+Xdebug only starts a debug session when triggered this way (via the browser extension, or an
+`XDEBUG_TRIGGER` cookie/param/header) - it does not run on every request. This matters for
+performance testing/profiling in this environment: with the trigger off, ordinary page loads
+don't pay Xdebug's per-request connection-attempt cost, which is otherwise easy to mistake for a
+real product slowdown (it compounds badly on any page that fetches many small files, e.g. a
+JS-module-heavy page). When measuring or comparing page load performance, make sure the trigger
+is off unless you're actually stepping through code.
+
 # Keycloak IdP Setup
 This will set up Keycloak as an Identity Provider (IdP) for Moodle. Users will be able to log into Moodle and Element via Keycloak once the following configuration is complete.
 
